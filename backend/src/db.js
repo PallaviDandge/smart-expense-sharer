@@ -13,11 +13,19 @@ const {
   DB_PASSWORD,
 } = process.env;
 
-const host = MYSQLHOST || DB_HOST || "localhost";
-const port = Number(MYSQLPORT || DB_PORT || "3306");
-const database = MYSQLDATABASE || DB_NAME || "smart_expernse";
-const username = MYSQLUSER || DB_USER || "root";
-const password = MYSQLPASSWORD || DB_PASSWORD || "";
+function requireEnv(value, name) {
+  if (value == null || value === "") {
+    throw new Error(`Missing database environment variable: ${name}`);
+  }
+
+  return value;
+}
+
+const host = requireEnv(MYSQLHOST || DB_HOST, "DB_HOST");
+const port = Number(requireEnv(MYSQLPORT || DB_PORT, "DB_PORT"));
+const database = requireEnv(MYSQLDATABASE || DB_NAME, "DB_NAME");
+const username = requireEnv(MYSQLUSER || DB_USER, "DB_USER");
+const password = requireEnv(MYSQLPASSWORD || DB_PASSWORD, "DB_PASSWORD");
 
 const sequelize = new Sequelize(database, username, password, {
   host,
