@@ -13,7 +13,7 @@ const {
   DB_PORT = "3306",
   DB_NAME = "railway",
   DB_USER = "root",
-  DB_PASSWORD = "PjfUDtUPmeoRYGIbNowNPetMOaVHdSYB",
+  DB_PASSWORD = "BRcSDNsFvNlbQVwyLbTVMwnwyagdIEcF",
 } = process.env;
 
 
