@@ -22,7 +22,7 @@ const sequelize = new Sequelize(
 );
 
 const RETRYABLE_CODES = new Set(["ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT"]);
-const MAX_RETRIES = 10;
+const MAX_RETRIES = 5;
 
 async function connectWithRetry() {
   let delay = 1000;

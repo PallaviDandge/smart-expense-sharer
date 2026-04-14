@@ -8,31 +8,48 @@ const { expensesRouter } = require("./routes/expenses");
 const { summaryRouter } = require("./routes/summary");
 
 const PORT = Number(process.env.PORT || 4000);
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+// Ensure this matches your Vercel URL in the Railway Variables tab
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "https://smart-expense-sharer.vercel.app";
 
 async function main() {
+  // 1. Establish connection with the database using the retry logic
   await connectWithRetry();
+
   try {
+    // 2. Automatically create/sync tables based on your Sequelize models
+    // This is what adds the tables to your empty Railway MySQL instance
+    await sequelize.sync({ alter: false }); 
+    console.log("[db] Database tables synced successfully.");
+
+    // 3. Debug: Verify which database we are actually connected to
     const [rows] = await sequelize.query("SELECT DATABASE() AS currentDb");
     const currentDb = Array.isArray(rows) && rows[0] ? rows[0].currentDb : null;
-    console.log("Connected DB:", currentDb);
+    console.log("Connected DB Name:", currentDb);
   } catch (e) {
-    console.log("Connected DB: (unable to query)");
+    console.error("[db] Error during sync or initial query:", e.message);
   }
 
   const app = express();
-  app.use(cors({ origin: FRONTEND_ORIGIN }));
+  
+  // CORS configuration to allow your Vercel frontend to communicate with this backend
+  app.use(cors({ 
+    origin: FRONTEND_ORIGIN,
+    credentials: true 
+  }));
+  
   app.use(express.json({ limit: "1mb" }));
 
+  // Health check for Railway deployment monitoring
   app.get("/health", (req, res) => res.json({ ok: true }));
+
+  // Debug endpoints (useful for verifying Railway env variables)
   app.get("/api/debug/db", (req, res) => {
     const cfg = sequelize?.config ?? {};
     res.json({
       env: {
-        DB_HOST: process.env.DB_HOST,
-        DB_PORT: process.env.DB_PORT,
-        DB_NAME: process.env.DB_NAME,
-        DB_USER: process.env.DB_USER,
+        MYSQLHOST: process.env.MYSQLHOST,
+        MYSQLDATABASE: process.env.MYSQLDATABASE,
+        FRONTEND_ORIGIN: process.env.FRONTEND_ORIGIN,
       },
       sequelize: {
         database: cfg.database,
@@ -43,39 +60,24 @@ async function main() {
       },
     });
   });
-  app.get("/api/debug/current-db", async (req, res) => {
-    const [rows] = await sequelize.query("SELECT DATABASE() AS currentDb");
-    res.json({ currentDb: rows?.[0]?.currentDb ?? null });
-  });
-  app.get("/api/debug/mysql-info", async (req, res) => {
-    const [rows] = await sequelize.query(`
-      SELECT
-        DATABASE() AS currentDb,
-        @@version AS version,
-        @@version_comment AS versionComment,
-        @@port AS port,
-        @@hostname AS hostname,
-        @@datadir AS datadir,
-        USER() AS user
-    `);
-    res.json(rows?.[0] ?? {});
-  });
+
+  // API Routes
   app.use("/api/expenses", expensesRouter);
   app.use("/api", summaryRouter);
 
+  // Global Error Handler
   app.use((err, req, res, next) => {
-    // eslint-disable-next-line no-unused-vars
     console.error(err);
     res.status(500).json({ error: "Unexpected server error" });
   });
 
-  app.listen(PORT, () => {
-    console.log(`Backend listening on http://localhost:${PORT}`);
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Backend listening on port ${PORT}`);
+    console.log(`CORS allowed for: ${FRONTEND_ORIGIN}`);
   });
 }
 
 main().catch((e) => {
-  console.error(e);
+  console.error("Critical failure during startup:", e);
   process.exit(1);
 });
-
