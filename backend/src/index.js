@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { sequelize } = require("./models");
+const { connectWithRetry } = require("./db");
 const { expensesRouter } = require("./routes/expenses");
 const { summaryRouter } = require("./routes/summary");
 
@@ -10,7 +11,7 @@ const PORT = Number(process.env.PORT || 4000);
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 
 async function main() {
-  await sequelize.authenticate();
+  await connectWithRetry();
   try {
     const [rows] = await sequelize.query("SELECT DATABASE() AS currentDb");
     const currentDb = Array.isArray(rows) && rows[0] ? rows[0].currentDb : null;
