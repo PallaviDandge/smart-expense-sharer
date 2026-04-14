@@ -1,12 +1,21 @@
 const { Sequelize } = require("sequelize");
 
+// const {
+//   DB_HOST = "localhost",
+//   DB_PORT = "3306",
+//   DB_NAME = "smart_expernse",
+//   DB_USER = "root",
+//   DB_PASSWORD = "",
+// } = process.env;
+
 const {
-  DB_HOST = "localhost",
+  DB_HOST = "monorail.proxy.rlwy.net",
   DB_PORT = "3306",
-  DB_NAME = "smart_expernse",
+  DB_NAME = "railway",
   DB_USER = "root",
-  DB_PASSWORD = "",
+  DB_PASSWORD = "PjfUDtUPmeoRYGIbNowNPetMOaVHdSYB",
 } = process.env;
+
 
 const sequelize = new Sequelize(DB_NAME, DB_USER, DB_PASSWORD, {
   host: DB_HOST,
