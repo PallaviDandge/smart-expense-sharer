@@ -35,4 +35,36 @@ const sequelize = new Sequelize(database, username, password, {
   define: { underscored: true },
 });
 
-module.exports = { sequelize };
+const RETRYABLE_CODES = new Set(["ECONNREFUSED", "ENOTFOUND"]);
+const MAX_RETRIES = 10;
+
+async function connectWithRetry() {
+  let delay = 1000;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[db] Connection attempt ${attempt}/${MAX_RETRIES}...`);
+      await sequelize.authenticate();
+      console.log("[db] MySQL connection established successfully.");
+      return;
+    } catch (err) {
+      const code = err.original?.code ?? err.code;
+      const isRetryable = RETRYABLE_CODES.has(code);
+
+      if (!isRetryable || attempt === MAX_RETRIES) {
+        console.error(
+          `[db] Connection failed on attempt ${attempt} with error: ${err.message}`
+        );
+        throw err;
+      }
+
+      console.warn(
+        `[db] Attempt ${attempt} failed (${code}). Retrying in ${delay / 1000}s...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      delay *= 2;
+    }
+  }
+}
+
+module.exports = { sequelize, connectWithRetry };
