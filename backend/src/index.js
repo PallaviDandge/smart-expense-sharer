@@ -8,41 +8,59 @@ const { expensesRouter } = require("./routes/expenses");
 const { summaryRouter } = require("./routes/summary");
 
 const PORT = Number(process.env.PORT || 4000);
-// Ensure this matches your Vercel URL in the Railway Variables tab
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "https://smart-expense-sharer.vercel.app";
 
 async function main() {
-  // 1. Establish connection with the database using the retry logic
+  // 1. Establish connection with the database
   await connectWithRetry();
 
   try {
-    // 2. Automatically create/sync tables based on your Sequelize models
-    // This is what adds the tables to your empty Railway MySQL instance
-    await sequelize.sync({ alter: false }); 
+    // 2. Sync Models (Creates tables in Railway MySQL if they don't exist)
+    await sequelize.sync({ alter: false });
     console.log("[db] Database tables synced successfully.");
 
-    // 3. Debug: Verify which database we are actually connected to
     const [rows] = await sequelize.query("SELECT DATABASE() AS currentDb");
     const currentDb = Array.isArray(rows) && rows[0] ? rows[0].currentDb : null;
-    console.log("Connected DB Name:", currentDb);
+    console.log("Connected DB:", currentDb);
   } catch (e) {
-    console.error("[db] Error during sync or initial query:", e.message);
+    console.error("[db] Error during sync or query:", e.message);
   }
 
   const app = express();
   
-  // CORS configuration to allow your Vercel frontend to communicate with this backend
+  // 3. Robust CORS Configuration
   app.use(cors({ 
-    origin: FRONTEND_ORIGIN,
-    credentials: true 
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) return callback(null, true);
+      
+      const allowedOrigins = [
+        FRONTEND_ORIGIN,
+        "https://smart-expense-sharer.vercel.app",
+        "http://localhost:5173"
+      ];
+
+      // Check if the origin starts with our expected domain (handles trailing slashes)
+      const isAllowed = allowedOrigins.some(allowed => origin.startsWith(allowed));
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        console.warn(`[CORS] Blocked request from origin: ${origin}`);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
   }));
-  
+
   app.use(express.json({ limit: "1mb" }));
 
-  // Health check for Railway deployment monitoring
+  // Health check
   app.get("/health", (req, res) => res.json({ ok: true }));
 
-  // Debug endpoints (useful for verifying Railway env variables)
+  // Debug endpoints
   app.get("/api/debug/db", (req, res) => {
     const cfg = sequelize?.config ?? {};
     res.json({
@@ -54,14 +72,12 @@ async function main() {
       sequelize: {
         database: cfg.database,
         host: cfg.host,
-        port: cfg.port,
         username: cfg.username,
-        dialect: cfg.dialect,
       },
     });
   });
 
-  // API Routes
+  // Routes
   app.use("/api/expenses", expensesRouter);
   app.use("/api", summaryRouter);
 
@@ -71,6 +87,7 @@ async function main() {
     res.status(500).json({ error: "Unexpected server error" });
   });
 
+  // Start Server on 0.0.0.0 for Docker/Railway compatibility
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Backend listening on port ${PORT}`);
     console.log(`CORS allowed for: ${FRONTEND_ORIGIN}`);
